@@ -8,14 +8,27 @@ import {VRFV2PlusClient} from "@chainlink/contracts/src/v0.8/vrf/dev/libraries/V
 // import {AutomationCompatibleInterface} from "@chainlink/contracts/src/v0.8/interfaces/AutomationCompatibleInterface.sol";
 
 /**
- * @title Ether-Lotto (Ether Lottery)
+ * @title Ether-Lotto (Ethereum Lottery)
  * @author Patrick Ose Ehimen
  * @notice Etherloto is a decentralized lottery smart contract built with Solidity using Foundry. It allows users to participate in secure, transparent lottery draws on the Ethereum blockchain.
  */
 contract EtherLotto is VRFConsumerBaseV2Plus {
     error EtherLotto__sendMoreToEnterLottery();
     error EtherLotto__TransferFailed();
+    error EtherLotto__LotteryNotOpen();
+    error EtherLotto__UpkeepNotNeeded(
+        uint256 currentBalance,
+        uint256 numPlayers,
+        uint256 etherLottoState
+    );
 
+    /* Type declarations */
+    enum EtherLottoState {
+        OPEN,
+        CALCULATING
+    }
+
+    /** State Variables */
     uint256 private immutable i_entranceFee;
     uint256 private immutable i_interval;
     bytes32 private immutable i_keyHash;
@@ -29,9 +42,11 @@ contract EtherLotto is VRFConsumerBaseV2Plus {
     uint256 private s_lastTimeStamp;
     address payable[] private s_players;
     address private s_recentWinner;
+    EtherLottoState private s_etherLottoState;
 
     event LotteryEntered(address indexed player);
     event RequestedLotteryWinner(uint256 indexed requestId);
+    event WinnerPicked(address indexed player);
 
     constructor(
         uint256 entranceFee,
@@ -43,26 +58,52 @@ contract EtherLotto is VRFConsumerBaseV2Plus {
     ) VRFConsumerBaseV2Plus(vrfCoordinatorV2) {
         i_entranceFee = entranceFee;
         i_interval = interval;
-        s_lastTimeStamp = block.timestamp;
         i_keyHash = gasLane;
         i_subscriptionId = subscriptionId;
         i_callbackGasLimit = callbackGasLimit;
+
+        s_lastTimeStamp = block.timestamp;
+        s_etherLottoState = EtherLottoState.OPEN;
     }
 
     function enterLottery() external payable {
         if (msg.value < i_entranceFee) {
             revert EtherLotto__sendMoreToEnterLottery();
         }
+        if (s_etherLottoState != EtherLottoState.OPEN) {
+            revert EtherLotto__LotteryNotOpen();
+        }
         s_players.push(payable(msg.sender));
 
         emit LotteryEntered(msg.sender);
     }
 
-    function pickAWinner() external {
-        // check t see if enough time has passed
-        if ((block.timestamp - s_lastTimeStamp) < i_interval) {
-            revert();
+    function checkUpkeep(
+        bytes memory /* checkData */
+    ) public view returns (bool upkeepNeeded, bytes memory /* performData */) {
+        bool isOpen = EtherLottoState.OPEN == s_etherLottoState;
+        bool timePassed = ((block.timestamp - s_lastTimeStamp) > i_interval);
+        bool hasPlayers = s_players.length > 0;
+        bool hasBalance = address(this).balance > 0;
+        upkeepNeeded = (timePassed && isOpen && hasBalance && hasPlayers);
+
+        return (upkeepNeeded, "0x0");
+    }
+
+    function performUpkeep(bytes calldata /* performData */) external {
+        // check to see if enough time has passed
+        (bool upkeepNeeded, ) = checkUpkeep("");
+
+        if (!upkeepNeeded) {
+            revert EtherLotto__UpkeepNotNeeded(
+                address(this).balance,
+                s_players.length,
+                uint256(s_etherLottoState)
+            );
         }
+
+        s_etherLottoState = EtherLottoState.CALCULATING;
+
         // get random number
         uint256 requestId = s_vrfCoordinator.requestRandomWords(
             VRFV2PlusClient.RandomWordsRequest({
@@ -89,15 +130,27 @@ contract EtherLotto is VRFConsumerBaseV2Plus {
         address payable recentWinner = s_players[indexOfWinner];
         s_recentWinner = recentWinner;
         // s_players = new address payable[](0);
+        s_etherLottoState = EtherLottoState.OPEN;
+        s_lastTimeStamp = block.timestamp;
 
         (bool success, ) = recentWinner.call{value: address(this).balance}("");
         if (!success) {
             revert EtherLotto__TransferFailed();
         }
+
+        emit WinnerPicked(recentWinner);
     }
 
     /** Getter Functions */
     function getEntranceFee() external view returns (uint256) {
         return i_entranceFee;
+    }
+
+    function getEtherLottoState() external view returns (EtherLottoState) {
+        return s_etherLottoState;
+    }
+
+    function getPlayer(uint256 indexOfPlayer) external view returns (address) {
+        return s_players[indexOfPlayer];
     }
 }
