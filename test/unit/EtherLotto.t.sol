@@ -5,7 +5,8 @@ pragma solidity 0.8.19;
 import {Test, console2} from "forge-std/Test.sol";
 import {DeployEtherLotto} from "../../script/DeployEtherLotto.s.sol";
 import {EtherLotto} from "../../src/EtherLotto.sol";
-import {HelperConfig} from "../../script/config/HelperConfig.s.sol";
+// import {HelperConfig} from "../../script/config/HelperConfig.s.sol";
+import {HelperConfig} from "../../script/HelperConfig.s.sol";
 
 contract EtherLottoTest is Test {
     EtherLotto public etherLotto;
@@ -81,5 +82,29 @@ contract EtherLottoTest is Test {
         vm.expectRevert(EtherLotto.EtherLotto__LotteryNotOpen.selector);
         vm.prank(PLAYER);
         etherLotto.enterLottery{value: lotteryEntranceFee}();
+    }
+
+    function testCheckUpkeepReturnsFalseIfItHasNoBalance() public {
+        vm.warp(block.timestamp + automationUpdateInterval + 1);
+        vm.roll(block.number + 1);
+
+        (bool upkeepNeeded, ) = etherLotto.checkUpkeep("");
+
+        assert(!upkeepNeeded);
+    }
+
+    function testCheckUpkeepReturnsFalseIfLotteryIsntOpen() public {
+        vm.prank(PLAYER);
+        etherLotto.enterLottery{value: lotteryEntranceFee}();
+        vm.warp(block.timestamp + automationUpdateInterval + 1);
+        vm.roll(block.number + 1);
+        etherLotto.performUpkeep("");
+        EtherLotto.EtherLottoState etherLottoState = etherLotto
+            .getEtherLottoState();
+
+        (bool upkeepNeeded, ) = etherLotto.checkUpkeep("");
+
+        // assert(etherLotto == EtherLotto.EtherLottoState.CALCULATING);
+        assert(upkeepNeeded == false);
     }
 }
