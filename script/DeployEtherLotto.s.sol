@@ -3,8 +3,9 @@ pragma solidity ^0.8.19;
 
 import {Script} from "forge-std/Script.sol";
 import {EtherLotto} from "../src/EtherLotto.sol";
-import {HelperConfig} from "./config/HelperConfig.s.sol";
-import {CreateSubscription} from "./Interactions.s.sol";
+// import {HelperConfig} from "./config/HelperConfig.s.sol";
+import {HelperConfig} from "./HelperConfig.s.sol";
+import {CreateSubscription, FundSubscription, AddConsumer} from "./Interactions.s.sol";
 
 contract DeployEtherLotto is Script {
     function run() public {}
@@ -22,6 +23,15 @@ contract DeployEtherLotto is Script {
                 config.vrfCoordinatorV2_5
                 // config.account
             );
+            FundSubscription fundSubscription = new FundSubscription();
+            fundSubscription.fundSubscription(
+                config.vrfCoordinatorV2_5,
+                config.subscriptionId,
+                config.link
+                // config.account
+            );
+
+            // helperConfig.setConfig(block.chainid, config);
         }
 
         vm.startBroadcast();
@@ -34,6 +44,14 @@ contract DeployEtherLotto is Script {
             config.callbackGasLimit
         );
         vm.stopBroadcast();
+
+        AddConsumer addConsumer = new AddConsumer();
+        addConsumer.addConsumer(
+            address(etherLotto),
+            config.vrfCoordinatorV2_5,
+            config.subscriptionId
+            // config.account
+        );
 
         return (etherLotto, helperConfig);
     }
