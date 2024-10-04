@@ -1,66 +1,118 @@
-## Foundry
+# Ether Lotto
 
-**Foundry is a blazing fast, portable and modular toolkit for Ethereum application development written in Rust.**
+Ether Lotto is a decentralized lottery application built on Ethereum using Foundry for development and testing. It leverages Chainlink VRF for secure randomness and Chainlink Automation for maintaining the lottery state.
 
-Foundry consists of:
+This README provides a comprehensive overview of the Ether Lotto project, including installation instructions, usage guidelines, project structure, and information on testing and deployment.
 
--   **Forge**: Ethereum testing framework (like Truffle, Hardhat and DappTools).
--   **Cast**: Swiss army knife for interacting with EVM smart contracts, sending transactions and getting chain data.
--   **Anvil**: Local Ethereum node, akin to Ganache, Hardhat Network.
--   **Chisel**: Fast, utilitarian, and verbose solidity REPL.
+## Table of Contents
 
-## Documentation
+- [Overview](#overview)
+- [Features](#features)
+- [Prerequisites](#prerequisites)
+- [Installation](#installation)
+- [Usage](#usage)
+- [Project Structure](#project-structure)
+- [Testing](#testing)
+- [Deployment](#deployment)
+- [Scripts](#scripts)
+- [Configuration](#configuration)
+- [Contributing](#contributing)
+- [License](#license)
 
-https://book.getfoundry.sh/
+## Overview
+
+Ether Lotto is a smart contract-based lottery system that allows users to participate in secure, transparent lottery draws on the Ethereum blockchain. It uses Chainlink VRF (Verifiable Random Function) to ensure fair and verifiable randomness in winner selection.
+
+## Features
+
+- Decentralized lottery system
+- Chainlink VRF integration for secure randomness
+- Chainlink Automation for automatic lottery state management
+- Configurable entrance fee and lottery interval
+- Support for multiple networks (Sepolia, Fuji, and local development)
+- Comprehensive test suite
+
+## Prerequisites
+
+- [Foundry](https://book.getfoundry.sh/getting-started/installation.html)
+
+## Installation
+
+1. Clone the repository:
+
+   ```
+   git clone https://github.com/Patrick-Ehimen/ether-lotto.git
+   cd ether-lotto
+   ```
+
+2. Install dependencies:
+
+```makefile
+   make install
+```
 
 ## Usage
 
 ### Build
 
-```shell
-$ forge build
+Compile the smart contracts:
+
+```makefile
+make build
 ```
 
 ### Test
 
-```shell
-$ forge test
-```
+Run the test suite:
 
-### Format
-
-```shell
-$ forge fmt
-```
-
-### Gas Snapshots
-
-```shell
-$ forge snapshot
-```
-
-### Anvil
-
-```shell
-$ anvil
+```makefile
+make test
 ```
 
 ### Deploy
 
-```shell
-$ forge script script/Counter.s.sol:CounterScript --rpc-url <your_rpc_url> --private-key <your_private_key>
+Deploy the Ether Lotto contract:
+
+```makefile
+make deploy
 ```
 
-### Cast
+## Project Structure
 
-```shell
-$ cast <subcommand>
+- `src/`: Smart contract source files
+  - `EtherLotto.sol`: Main lottery contract
+  - `constants/`: Constants used across the project
+- `test/`: Test files
+  - `unit/`: Unit tests for the EtherLotto contract
+- `script/`: Deployment and interaction scripts
+- `lib/`: External libraries and dependencies
+
+## Testing
+
+The project includes a comprehensive test suite in the `test/unit/EtherLotto.t.sol` file. Run the tests using:
+
+```makefile
+make test
 ```
 
-### Help
+## Deployment
 
-```shell
-$ forge --help
-$ anvil --help
-$ cast --help
-```
+The `DeployEtherLotto.s.sol` script handles the deployment of the Ether Lotto contract. It uses the `HelperConfig` to manage network-specific configurations.
+
+## Scripts
+
+- `DeployEtherLotto.s.sol`: Deploys the Ether Lotto contract
+- `Interactions.s.sol`: Contains scripts for creating subscriptions, adding consumers, and funding subscriptions
+- `HelperConfig.s.sol`: Manages network-specific configurations
+
+## Configuration
+
+The `HelperConfig.s.sol` file contains network-specific configurations for different chains (Fuji, Sepolia, and local development). Update this file to add or modify network configurations.
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## License
+
+This project is licensed under the MIT License.
