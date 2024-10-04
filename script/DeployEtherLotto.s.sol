@@ -20,21 +20,21 @@ contract DeployEtherLotto is Script {
                 config.subscriptionId,
                 config.vrfCoordinatorV2_5
             ) = createSubscription.createSubscription(
-                config.vrfCoordinatorV2_5
-                // config.account
+                config.vrfCoordinatorV2_5,
+                config.account
             );
             FundSubscription fundSubscription = new FundSubscription();
             fundSubscription.fundSubscription(
                 config.vrfCoordinatorV2_5,
                 config.subscriptionId,
-                config.link
-                // config.account
+                config.link,
+                config.account
             );
 
             // helperConfig.setConfig(block.chainid, config);
         }
 
-        vm.startBroadcast();
+        vm.startBroadcast(config.account);
         EtherLotto etherLotto = new EtherLotto(
             config.lotteryEntranceFee,
             config.automationUpdateInterval,
@@ -49,8 +49,8 @@ contract DeployEtherLotto is Script {
         addConsumer.addConsumer(
             address(etherLotto),
             config.vrfCoordinatorV2_5,
-            config.subscriptionId
-            // config.account
+            config.subscriptionId,
+            config.account
         );
 
         return (etherLotto, helperConfig);
