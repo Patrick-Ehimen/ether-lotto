@@ -7,6 +7,8 @@ import {DeployEtherLotto} from "../../script/DeployEtherLotto.s.sol";
 import {EtherLotto} from "../../src/EtherLotto.sol";
 // import {HelperConfig} from "../../script/config/HelperConfig.s.sol";
 import {HelperConfig} from "../../script/HelperConfig.s.sol";
+import {Vm} from "forge-std/Vm.sol";
+import {VRFCoordinatorV2_5Mock} from "@chainlink/contracts/src/v0.8/vrf/mocks/VRFCoordinatorV2_5Mock.sol";
 
 contract EtherLottoTest is Test {
     EtherLotto public etherLotto;
@@ -106,5 +108,130 @@ contract EtherLottoTest is Test {
 
         // assert(etherLotto == EtherLotto.EtherLottoState.CALCULATING);
         assert(upkeepNeeded == false);
+    }
+
+    function testPerformUpkeepCanOnlyRunIfCheckUpkeepIsTrue() public {
+        vm.prank(PLAYER);
+        etherLotto.enterLottery{value: lotteryEntranceFee}();
+        vm.warp(block.timestamp + automationUpdateInterval + 1);
+        vm.roll(block.number + 1);
+
+        etherLotto.performUpkeep("");
+    }
+
+    function testPerformUpkeepRevertsIfCheckUpkeepIsFalse() public {
+        uint256 currentBalance = 0;
+        uint256 numPlayers = 0;
+        EtherLotto.EtherLottoState lState = etherLotto.getEtherLottoState();
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                EtherLotto.EtherLotto__UpkeepNotNeeded.selector,
+                currentBalance,
+                numPlayers,
+                lState
+            )
+        );
+        etherLotto.performUpkeep("");
+    }
+
+    function testPerformUpkeepUpdatesRaffleStateAndEmitsRequestId() public {
+        vm.prank(PLAYER);
+        etherLotto.enterLottery{value: lotteryEntranceFee}();
+        vm.warp(block.timestamp + automationUpdateInterval + 1);
+        vm.roll(block.number + 1);
+
+        vm.recordLogs();
+        etherLotto.performUpkeep(""); // emits requestId
+        Vm.Log[] memory entries = vm.getRecordedLogs();
+        bytes32 requestId = entries[1].topics[1];
+
+        EtherLotto.EtherLottoState etherLottoState = etherLotto
+            .getEtherLottoState();
+        // requestId = etherLotto.getLastRequestId();
+        assert(uint256(requestId) > 0);
+        assert(uint256(etherLottoState) == 1); // 0 = open, 1 = calculating
+    }
+
+    modifier lotteryEntered() {
+        vm.prank(PLAYER);
+        etherLotto.enterLottery{value: lotteryEntranceFee}();
+        vm.warp(block.timestamp + automationUpdateInterval + 1);
+        vm.roll(block.number + 1);
+        _;
+    }
+
+    modifier skipFork() {
+        if (block.chainid != 31337) {
+            return;
+        }
+        _;
+    }
+
+    function testFulfillRandomWordsCanOnlyBeCalledAfterPerformUpkeep()
+        public
+        lotteryEntered
+        skipFork
+    {
+        vm.expectRevert(VRFCoordinatorV2_5Mock.InvalidRequest.selector);
+
+        VRFCoordinatorV2_5Mock(vrfCoordinatorV2_5).fulfillRandomWords(
+            0,
+            address(etherLotto)
+        );
+
+        vm.expectRevert(VRFCoordinatorV2_5Mock.InvalidRequest.selector);
+        VRFCoordinatorV2_5Mock(vrfCoordinatorV2_5).fulfillRandomWords(
+            1,
+            address(etherLotto)
+        );
+    }
+
+    function testFulfillRandomWordsPicksAWinnerResetsAndSendsMoney()
+        public
+        lotteryEntered
+        skipFork
+    {
+        address expectedWinner = address(1);
+
+        uint256 additionalEntrances = 3;
+        uint256 startingIndex = 1; // We have starting index be 1 so we can start with address(1) and not address(0)
+
+        for (
+            uint256 i = startingIndex;
+            i < startingIndex + additionalEntrances;
+            i++
+        ) {
+            address player = address(uint160(i));
+            hoax(player, 10 ether); // deal 1 eth to the player
+            etherLotto.enterLottery{value: lotteryEntranceFee}();
+        }
+
+        uint256 startingTimeStamp = etherLotto.getLastTimeStamp();
+        uint256 startingBalance = expectedWinner.balance;
+
+        vm.recordLogs();
+        etherLotto.performUpkeep(""); // emits requestId
+        Vm.Log[] memory entries = vm.getRecordedLogs();
+        console2.logBytes32(entries[1].topics[1]);
+        bytes32 requestId = entries[1].topics[1]; // get the requestId from the logs
+
+        VRFCoordinatorV2_5Mock(vrfCoordinatorV2_5).fulfillRandomWords(
+            uint256(requestId),
+            address(etherLotto)
+        );
+
+        address recentWinner = etherLotto.getRecentWinner();
+
+        EtherLotto.EtherLottoState etherLottoState = etherLotto
+            .getEtherLottoState();
+        uint256 winnerBalance = recentWinner.balance;
+        uint256 endingTimeStamp = etherLotto.getLastTimeStamp();
+        uint256 prize = lotteryEntranceFee * (additionalEntrances + 1);
+
+        assert(recentWinner == expectedWinner);
+        // assert(uint256(etherLotto) == 0);
+        assert(winnerBalance == startingBalance + prize);
+        assert(endingTimeStamp > startingTimeStamp);
     }
 }
