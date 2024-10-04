@@ -16,4 +16,7 @@ sepolia = {key = "${ETHERSCAN_API_KEY}"}
 sepolia = "${SEPOLIA_RPC_URL}"
 fuji = "${FUJI_RPC_URL}"
 
+[fuzz]
+runs = 256
+
 # See more config options https://github.com/foundry-rs/foundry/tree/master/config
